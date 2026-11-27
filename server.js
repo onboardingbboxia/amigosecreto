@@ -69,6 +69,7 @@ function checkPass(pass, stored) {
 }
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const COOKIE = 'amigo_sesion';
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 function newSession(personId, remember) {
   const token = crypto.randomBytes(32).toString('base64url');
   const ttl = remember ? 180 * 864e5 : 864e5;
@@ -78,7 +79,7 @@ function newSession(personId, remember) {
 function cookieHeader(req, value, maxAge) {
   const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
   const age = maxAge == null ? '' : `; Max-Age=${maxAge}`;
-  return `${COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax${secure}${age}`;
+  return `${COOKIE}=${value}; Path=${BASE_PATH || '/'}; HttpOnly; SameSite=Lax${secure}${age}`;
 }
 function readCookie(req) {
   const m = (req.headers.cookie || '').match(new RegExp(`(?:^|;\\s*)${COOKIE}=([^;]+)`));

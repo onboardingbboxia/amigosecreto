@@ -448,6 +448,35 @@ route('POST', '/api/admin/retos/:id/toggle', { auth: true, admin: true }, ({ par
   pushAll('state'); return { ok: true };
 });
 
+// Supervisión: el organizador puede ver listas de deseos, parejas y todas las conversaciones.
+route('GET', '/api/admin/pairs', { auth: true, admin: true }, () => ({ pairs: all('SELECT giver, receiver FROM assignments').map(r => [r.giver, r.receiver]) }));
+route('GET', '/api/admin/wishes/:id', { auth: true, admin: true }, ({ params }) => ({
+  items: all('SELECT id, title, url, note, at FROM wishes WHERE person_id=? ORDER BY at', Number(params.id))
+}));
+route('GET', '/api/admin/threads', { auth: true, admin: true }, () => {
+  const out = [];
+  const g = one("SELECT COUNT(*) n, MAX(at) last FROM messages WHERE thread='group'");
+  out.push({ key: 'group', kind: 'group', n: g.n, last: g.last || 0 });
+  for (const r of all("SELECT thread, COUNT(*) n, MAX(at) last FROM messages WHERE thread LIKE 'dm:%' GROUP BY thread")) {
+    const [, a, b] = r.thread.split(':').map(Number);
+    out.push({ key: r.thread, kind: 'dm', a, b, n: r.n, last: r.last });
+  }
+  for (const r of all('SELECT thread, COUNT(*) n, MAX(at) last FROM messages WHERE thread LIKE ? GROUP BY thread', `anon:%:${drawId()}`)) {
+    const giver = Number(r.thread.split(':')[1]);
+    out.push({ key: r.thread, kind: 'anon', giver, receiver: receiverOf(giver), n: r.n, last: r.last });
+  }
+  out.sort((x, y) => y.last - x.last);
+  return { threads: out };
+});
+route('GET', '/api/admin/messages', { auth: true, admin: true }, ({ query }) => {
+  const key = query.get('thread') || '';
+  if (!(key === 'group' || /^dm:\d+:\d+$/.test(key) || /^anon:\d+:[0-9a-f]+$/.test(key))) bad('Conversación no válida.');
+  const rows = all('SELECT id, sender, side, text, at FROM messages WHERE thread=? ORDER BY id DESC LIMIT 500', key).reverse();
+  let giver = null, receiver = null;
+  if (key.startsWith('anon:')) { giver = Number(key.split(':')[1]); receiver = receiverOf(giver); }
+  return { messages: rows.map(m => ({ id: m.id, from: m.sender != null ? m.sender : (m.side === 'santa' ? giver : receiver), text: m.text, at: m.at })) };
+});
+
 /* ---------------- Servidor HTTP ---------------- */
 const STATIC = { '/': 'index.html', '/index.html': 'index.html' };
 function readBody(req) {

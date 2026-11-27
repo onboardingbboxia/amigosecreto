@@ -84,6 +84,7 @@ main{padding-block:20px 48px}
 input[type=text],input[type=url],input[type=number],input[type=password],input[type=datetime-local],select,textarea{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0}
 textarea{resize:vertical;min-height:80px}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 150px}
+.stack>.field,.card>.field,.lf-fields>.field{flex:none}
 .seg{display:inline-flex;background:var(--sunk);border-radius:10px;padding:3px;gap:2px}
 .seg button{border:0;background:none;padding:6px 12px;border-radius:8px;font-weight:600;color:var(--muted);cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
@@ -412,7 +413,7 @@ async function loginView(){
       hint, slot),
     h("label",{class:"lf-check",for:"remember"}, remember, h("span",{text:"Recordarme en este dispositivo"})),
     err, btn,
-    h("p",{class:"lf-foot",text:"¿Olvidaste tu contraseña o no aparece tu nombre? Avísale al organizador."})
+    h("p",{class:"lf-foot",text:"El organizador puede ver las listas de deseos y los mensajes. ¿Olvidaste tu contraseña o no aparece tu nombre? Avísale al organizador."})
   );
   const hero = h("div",{class:"lhero"},
     h("div",{class:"gtag"}, h("div",{class:"line"}, h("span",{text:"Para"}), h("b",{text:"¿…?"})), h("div",{class:"line"}, h("span",{text:"De"}), h("b",{text:"Un amigo secreto"}))),
@@ -428,9 +429,9 @@ async function loginView(){
 function renderShell(){
   updaters.clear();
   const tabs = [["inicio","Intercambio"],["mensajes","Mensajes"],["juegos","Juegos"],["ranking","Ranking"]];
-  if (S.st.me.isAdmin) tabs.push(["admin","Organizar"]);
+  if (S.st.me.isAdmin){ tabs.push(["admin","Organizar"]); tabs.push(["super","Supervisión"]); }
   if (!tabs.some(t=>t[0]===S.tab)) S.tab="inicio";
-  const view = ({inicio:homeView, mensajes:msgView, juegos:gamesView, ranking:rankView, admin:adminView}[S.tab])();
+  const view = ({inicio:homeView, mensajes:msgView, juegos:gamesView, ranking:rankView, admin:adminView, super:superView}[S.tab])();
   app.replaceChildren(
     h("header",{class:"top"}, h("div",{class:"wrap gutter"},
       h("div",{class:"top-row"},
@@ -480,7 +481,7 @@ function homeView(){
         return h("div",{class:"stack"}, S.theirWish.map(w=>wishItem(w,false)));
       })
     ),
-    h("section",{class:"card c6"}, h("div",{class:"card-head"}, h("h2",{text:"Mi lista de deseos"}), h("span",{class:"pill red",text:"Solo la ve quien te regala"})), wishForm(), live(()=> S.myWish.length ? h("div",{class:"stack"}, S.myWish.map(w=>wishItem(w,true))) : h("div",{class:"empty",text:"Agrega enlaces a productos que te gusten o notas como tu talla, colores o cosas que no quieres."}))),
+    h("section",{class:"card c6"}, h("div",{class:"card-head"}, h("h2",{text:"Mi lista de deseos"}), h("span",{class:"pill red",text:"La ven quien te regala y el organizador"})), wishForm(), live(()=> S.myWish.length ? h("div",{class:"stack"}, S.myWish.map(w=>wishItem(w,true))) : h("div",{class:"empty",text:"Agrega enlaces a productos que te gusten o notas como tu talla, colores o cosas que no quieres."}))),
     h("section",{class:"card c6"}, h("h2",{text:"Mis apuntes privados"}), h("p",{class:"muted small",text:"Ideas de regalo, tallas, presupuesto gastado. Nadie más los ve."}), keyed(()=>[S.notes!==null], notesBox)),
     h("section",{class:"card c6"}, h("div",{class:"card-head"}, h("h2",{text:"Participantes"}), live(()=>h("span",{class:"small muted num",text:`${st().members.length} registrados`}))), live(()=>h("div",{class:"people"}, st().members.map(m=>h("span",{class:"person"}, avatar(m.id), m.name))))),
     h("section",{class:"card c12"}, h("div",{class:"card-head"}, h("h2",{text:"Mi cuenta"}), h("button",{class:"btn sm",type:"button",onclick:logout,text:"Salir de este dispositivo"})), accountForm())
@@ -559,7 +560,7 @@ function threadDefs(){
   if (st.hasGiver) out.push({sep:"Anónimos", id:"anon-kid", name:"Mi amigo secreto", sub:"No sabes quién es", av:h("span",{class:"av",style:"background:var(--accent)",text:"?"}), hint:"Tu amigo secreto puede escribirte aquí sin revelarse. Dale pistas de lo que te gusta.", who:m=>m.mine?"Tú":"Tu amigo secreto"});
   if (st.assignment){ const r=st.assignment.receiver; out.push({sep: st.hasGiver?null:"Anónimos", id:"anon-santa", name:nameOf(r), sub:"Le regalas · no sabe que eres tú", av:avatar(r), hint:`Escríbele a ${nameOf(r)} de forma anónima. Verá tus mensajes como «Tu amigo secreto».`, who:m=>m.mine?"Tú (anónimo)":nameOf(r)}); }
   let first=true;
-  st.members.filter(m=>m.id!==st.me.id).forEach(m=>{ out.push({sep:first?"Privados":null, id:"dm:"+m.id, name:m.name, av:avatar(m.id), hint:`Conversación privada entre tú y ${m.name}. Nadie más puede leerla.`, who:x=>x.mine?"Tú":m.name}); first=false; });
+  st.members.filter(m=>m.id!==st.me.id).forEach(m=>{ out.push({sep:first?"Privados":null, id:"dm:"+m.id, name:m.name, av:avatar(m.id), hint:`Conversación entre tú y ${m.name}.`, who:x=>x.mine?"Tú":m.name}); first=false; });
   return out;
 }
 function msgView(){
@@ -583,7 +584,7 @@ function msgView(){
   const threadList=()=>threadDefs().flatMap(d=>[d.sep?h("div",{class:"sep",text:d.sep}):null, h("button",{class:"thread",type:"button","aria-current":S.thread===d.id?"true":null,onclick:()=>{ S.thread=d.id; renderShell(); }}, d.av, h("div",{style:"min-width:0;flex:1"}, h("div",{class:"nm",text:d.name}), d.sub?h("div",{class:"sub",text:d.sub}):null), unread(d.id)?h("span",{class:"dot","aria-label":"nuevo"}):null)]);
   return h("div",{class:"msg-layout"},
     h("nav",{class:"card threads","aria-label":"Conversaciones"}, live(threadList,"div",{style:"display:contents"})),
-    h("section",{class:"card pane"}, h("div",{class:"pane-head"}, h("div",{style:"min-width:0"}, h("h3",{text:spec.name}), h("p",{class:"small muted",text:spec.hint}))), list, composer));
+    h("section",{class:"card pane"}, h("div",{class:"pane-head"}, h("div",{style:"min-width:0"}, h("h3",{text:spec.name}), h("p",{class:"small muted",text:spec.hint}))), list, h("p",{class:"small muted",style:"padding:8px 18px 0;margin:0",text:"El organizador puede leer todos los mensajes, incluidos los privados y los anónimos."}), composer));
 }
 
 /* ---------- Juegos ---------- */
@@ -654,6 +655,40 @@ function rankView(){
     h("section",{class:"card c12"}, h("h2",{text:"Tabla de puntos"}), live(()=>h("div",{class:"table-wrap"}, h("table",{}, h("thead",{}, h("tr",{}, ["#","Participante","Trivia","Reto diario","Retos","Total"].map(x=>h("th",{text:x})))),
       h("tbody",{}, S.st.ranking.map((x,i)=>h("tr",{class:x.id===S.st.me.id?"me":null}, h("td",{text:String(i+1)}), h("td",{}, h("span",{class:"row",style:"gap:8px;flex-wrap:nowrap"}, avatar(x.id), nameOf(x.id))), h("td",{text:String(x.trivia)}), h("td",{text:String(x.daily)}), h("td",{text:String(x.retos)}), h("td",{class:"tot",text:String(x.total)})))))))
     )
+  );
+}
+
+/* ---------- Supervisión (solo organizador) ---------- */
+function superView(){
+  const st = { pairs:null, wishPerson:"", wishes:null, threads:null, thread:null, msgs:null };
+  const pairsBox = h("div",{class:"stack"});
+  const drawPairs = ()=>{
+    pairsBox.replaceChildren(...(st.pairs ? [st.pairs.length ? h("div",{class:"people"}, st.pairs.map(([g,r])=>h("span",{class:"person",style:"padding-right:14px"}, avatar(g), nameOf(g), h("span",{class:"muted",text:"le regala a"}), avatar(r), nameOf(r)))) : h("div",{class:"empty",text:"Todavía no se hizo el sorteo."})]
+      : [h("p",{class:"muted small",text:"Si tú también participas, ver las parejas te quita la sorpresa."}), twoStep(h("button",{class:"btn",type:"button"}),"Mostrar las parejas","¿Seguro? Toca otra vez",async()=>{ st.pairs=(await api("GET","/api/admin/pairs")).pairs; drawPairs(); })]));
+  };
+  drawPairs();
+  const sel = h("select",{id:"sup-person"}, h("option",{value:"",text:"Elige una persona"}), S.st.admin.roster.map(p=>h("option",{value:String(p.id),text:p.name})));
+  const wishBox = h("div",{class:"stack"});
+  const drawWish = ()=>wishBox.replaceChildren(...(st.wishes===null ? [h("div",{class:"empty",text:"Elige una persona para ver su lista."})] : st.wishes.length ? st.wishes.map(w=>wishItem(w,false)) : [h("div",{class:"empty",text:"Esa persona todavía no agregó nada."})]));
+  sel.addEventListener("change", async()=>{ if(!sel.value){ st.wishes=null; drawWish(); return; } try{ st.wishes=(await api("GET","/api/admin/wishes/"+sel.value)).items; }catch(e){ toast(e.message); } drawWish(); });
+  drawWish();
+  const label = t => t.kind==="group" ? "Chat del grupo" : t.kind==="dm" ? `${nameOf(t.a)} ↔ ${nameOf(t.b)}` : `${nameOf(t.giver)} → ${t.receiver ? nameOf(t.receiver) : "?"}`;
+  const subOf = t => (t.kind==="anon" ? "Anónimo · " : t.kind==="dm" ? "Privado · " : "") + `${t.n} ${t.n===1?"mensaje":"mensajes"}`;
+  const list = h("div",{class:"msgs",role:"log"});
+  const drawMsgs = ()=>{ if (!st.thread) { list.replaceChildren(h("div",{class:"empty",text:"Elige una conversación."})); return; } if (st.msgs===null){ list.replaceChildren(h("p",{class:"muted small",text:"Cargando…"})); return; } list.replaceChildren(...(st.msgs.length ? st.msgs.map(m=>h("div",{class:"bubble"}, h("span",{class:"who",text:nameOf(m.from)}), h("div",{class:"tx",text:m.text}), h("span",{class:"tm",text:fmtTime(m.at)}))) : [h("div",{class:"empty",text:"Sin mensajes."})])); list.scrollTop=list.scrollHeight; };
+  const threadsBox = h("nav",{class:"card threads","aria-label":"Conversaciones"});
+  const drawThreads = ()=>threadsBox.replaceChildren(...(st.threads===null ? [h("p",{class:"muted small",style:"padding:8px",text:"Cargando…"})] : st.threads.length ? st.threads.map(t=>h("button",{class:"thread",type:"button","aria-current":st.thread===t.key?"true":null,onclick:()=>openThread(t)}, h("span",{class:"av",style:"background:"+(t.kind==="anon"?"var(--accent)":t.kind==="group"?"var(--pine)":"var(--gold)"),text:t.kind==="anon"?"?":t.kind==="group"?"G":"P"}), h("div",{style:"min-width:0;flex:1"}, h("div",{class:"nm",text:label(t)}), h("div",{class:"sub",text:subOf(t)})))) : [h("p",{class:"muted small",style:"padding:8px",text:"Aún no hay conversaciones."})]));
+  const title = h("h3",{text:"Conversaciones"});
+  async function openThread(t){ st.thread=t.key; st.msgs=null; title.textContent=label(t); drawThreads(); drawMsgs(); try{ st.msgs=(await api("GET","/api/admin/messages?thread="+encodeURIComponent(t.key))).messages; }catch(e){ toast(e.message); st.msgs=[]; } drawMsgs(); }
+  async function loadThreads(){ try{ st.threads=(await api("GET","/api/admin/threads")).threads; }catch(e){ toast(e.message); st.threads=[]; } drawThreads(); }
+  loadThreads(); drawThreads(); drawMsgs();
+  const refresh = h("button",{class:"btn sm",type:"button",onclick:async()=>{ await loadThreads(); const t=(st.threads||[]).find(x=>x.key===st.thread); if(t) openThread(t); },text:"Actualizar"});
+  return h("div",{class:"grid"},
+    h("section",{class:"card c12"}, h("div",{class:"notice",text:"Esta sección solo la ves tú. Los participantes están avisados de que el organizador puede ver las listas de deseos y todos los mensajes. Los apuntes privados y las contraseñas no se muestran."})),
+    h("section",{class:"card c6"}, h("h2",{text:"Parejas del sorteo"}), pairsBox),
+    h("section",{class:"card c6"}, h("h2",{text:"Listas de deseos"}), h("label",{class:"field",for:"sup-person"}, h("span",{class:"lbl",text:"Persona"}), sel), wishBox),
+    h("section",{class:"card c12",style:"padding:0;gap:0"}, h("div",{class:"pane-head",style:"justify-content:space-between"}, h("h2",{text:"Mensajes"}), refresh),
+      h("div",{class:"msg-layout",style:"padding:12px"}, threadsBox, h("section",{class:"card pane"}, h("div",{class:"pane-head"}, title), list)))
   );
 }
 

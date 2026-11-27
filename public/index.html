@@ -81,7 +81,7 @@ main{padding-block:20px 48px}
 .btn.danger{color:var(--accent);border-color:var(--accent)}
 .btn.sm{padding:5px 10px;font-size:.85rem;border-radius:8px}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-input[type=text],input[type=url],input[type=number],input[type=datetime-local],select,textarea{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0}
+input[type=text],input[type=url],input[type=number],input[type=password],input[type=datetime-local],select,textarea{width:100%;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-width:0}
 textarea{resize:vertical;min-height:80px}
 .field{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 150px}
 .seg{display:inline-flex;background:var(--sunk);border-radius:10px;padding:3px;gap:2px}
@@ -199,6 +199,44 @@ tr.me td{background:var(--accent-soft)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle}
 select{appearance:auto}
+
+/* Login: panel con la etiqueta de regalo + formulario compacto */
+.login{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,380px);gap:56px;align-items:center;width:min(900px,100%)}
+.lhero{display:flex;flex-direction:column;gap:12px;align-items:flex-start;min-width:0}
+.lhero h1{font-size:clamp(2rem,5vw,3.1rem);font-weight:800;letter-spacing:-.02em;overflow-wrap:anywhere}
+.lhero .gtag{margin:4px 0 14px 10px}
+.lhero-sub{color:var(--muted);margin:0}
+.dots{display:flex;flex-wrap:wrap;gap:6px;max-width:260px}
+.dots i{width:12px;height:12px;border-radius:50%;border:2px solid var(--line)}
+.dots i.on{background:var(--pine);border-color:var(--pine)}
+.lform{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.lf-title{font-size:1.25rem}
+.lf-fields{display:flex;flex-direction:column;gap:12px}
+.lform .field{gap:5px;flex:none}
+.lbl{font-size:.88rem;font-weight:600}
+.lf-hint{font-size:.88rem;color:var(--muted);margin:0}
+.lf-hint:empty,.lf-err:empty{display:none}
+.lform input:not([type=checkbox]),.lform select{height:44px;padding:0 12px}
+.sel{position:relative}
+.sel select{appearance:none;-webkit-appearance:none;padding-right:36px;cursor:pointer}
+.sel::after{content:"";position:absolute;right:15px;top:50%;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.pw{position:relative}
+.pw input{padding-right:88px!important}
+.pw-toggle{position:absolute;right:4px;top:4px;bottom:4px;border:0;background:none;color:var(--muted);font-weight:600;font-size:.85rem;padding:0 10px;border-radius:8px;cursor:pointer}
+.pw-toggle:hover{color:var(--ink);background:var(--line)}
+.lform input:focus-visible,.lform select:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+.lf-check{display:flex;gap:8px;align-items:center;font-size:.9rem;cursor:pointer}
+.lf-check input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.lf-err{color:var(--accent);font-size:.9rem;font-weight:600;margin:0}
+.lf-submit{width:100%;height:46px;font-size:1rem}
+.lf-foot{font-size:.82rem;color:var(--muted);margin:0}
+@media (max-width:760px){
+  .login{grid-template-columns:minmax(0,1fr);gap:18px}
+  .lhero{align-items:flex-start}
+  .lhero h1{font-size:1.9rem}
+  .lhero .gtag,.dots{display:none}
+  .lform{padding:18px}
+}
 </style>
 </head>
 <body>
@@ -297,66 +335,92 @@ document.addEventListener("visibilitychange", ()=>{ if (!document.hidden && S.st
 /* ---------- Entrar ---------- */
 const app = document.getElementById("app");
 function passInput(id, ph, auto){ return h("input",{type:"password",id,maxlength:"128",autocomplete:auto,placeholder:ph}); }
+function pwField(id, label, ph, auto, peers){
+  const inp = passInput(id, ph, auto);
+  const wrap = h("div",{class:"pw"}, inp);
+  if (peers){
+    const t = h("button",{type:"button",class:"pw-toggle","aria-pressed":"false","aria-label":"Mostrar contraseña",text:"Mostrar",onclick:()=>{
+      const on = t.getAttribute("aria-pressed")!=="true";
+      t.setAttribute("aria-pressed",String(on)); t.textContent = on?"Ocultar":"Mostrar"; t.setAttribute("aria-label", on?"Ocultar contraseña":"Mostrar contraseña");
+      [inp, ...peers()].forEach(x=>x && (x.type = on?"text":"password"));
+    }});
+    wrap.append(t);
+  }
+  return {inp, el:h("label",{class:"field",for:id}, h("span",{class:"lbl",text:label}), wrap)};
+}
 async function loginView(){
   updaters.clear();
   app.replaceChildren(h("div",{class:"center-screen gutter"}, h("p",{class:"muted",text:"Cargando…"})));
   let roster;
   try{ roster = await api("GET","/api/roster"); }catch(e){ app.replaceChildren(h("div",{class:"center-screen gutter"}, h("div",{class:"join stack"}, h("h2",{text:"No pudimos conectar"}), h("p",{class:"muted",text:e.message}), h("button",{class:"btn primary",type:"button",onclick:loginView,text:"Reintentar"})))); return; }
-  document.title = roster.title || "Amigo Secreto";
+  const title = roster.title || "Amigo Secreto";
+  document.title = title;
   const people = roster.people;
+  const regCount = people.filter(p=>p.registered).length;
   const last = store.get("amigo-ultimo-nombre");
-  const sel = h("select",{id:"who"}, h("option",{value:"",text:"Busca tu nombre…"}), people.map(p=>h("option",{value:String(p.id),text:p.name})));
+  const sel = h("select",{id:"who"}, h("option",{value:"",text:"Elige tu nombre"}), people.map(p=>h("option",{value:String(p.id),text:p.name})));
   if (last && people.some(p=>p.id===last)) sel.value = String(last);
-  const slot = h("div",{class:"stack"});
+  const hint = h("p",{class:"lf-hint"});
+  const slot = h("div",{class:"lf-fields"});
   const remember = h("input",{type:"checkbox",id:"remember",checked:true});
-  const show = h("input",{type:"checkbox",id:"show-pass"});
-  const status = h("p",{class:"small muted"});
-  const btn = h("button",{class:"btn primary",type:"submit"});
-  let mode = null, p1, p2, code;
+  const err = h("p",{class:"lf-err",role:"alert"});
+  const btn = h("button",{class:"btn primary lf-submit",type:"submit",text:"Entrar",disabled:true});
+  let mode=null, p1, p2, code;
   const draw = ()=>{
     const p = people.find(x=>String(x.id)===sel.value);
-    p1=p2=code=null; slot.replaceChildren(); status.textContent="";
-    if (!p){ mode=null; btn.hidden=true; return; }
-    btn.hidden=false;
+    slot.replaceChildren(); err.textContent=""; hint.textContent=""; p1=p2=code=null;
+    if (!p){ mode=null; btn.disabled=true; btn.textContent="Entrar"; return; }
+    btn.disabled=false;
     if (p.registered){
-      mode="login"; p1=passInput("pass","Tu contraseña","current-password");
-      slot.append(h("label",{class:"field",for:"pass"}, h("span",{class:"label",text:"Contraseña"}), p1));
-      btn.textContent="Entrar";
+      mode="login";
+      const f=pwField("pass","Contraseña","Tu contraseña","current-password",()=>[]);
+      p1=f.inp; slot.append(f.el); btn.textContent="Entrar";
     } else {
-      mode="register"; p1=passInput("pass","Mínimo 4 caracteres","new-password"); p2=passInput("pass2","Repite la contraseña","new-password");
-      slot.append(h("p",{class:"small",style:"font-weight:600",text:`Primera vez, ${p.name}. Crea tu contraseña.`}), h("label",{class:"field",for:"pass"}, h("span",{class:"label",text:"Crea tu contraseña"}), p1), h("label",{class:"field",for:"pass2"}, h("span",{class:"label",text:"Confírmala"}), p2));
-      if (p.isAdmin){ code=h("input",{type:"text",id:"admin-code",maxlength:"40",autocomplete:"off",placeholder:"XXXX-XXXX-XXXX",style:"text-transform:uppercase"}); slot.append(h("label",{class:"field",for:"admin-code"}, h("span",{class:"label",text:"Código de organizador"}), code), h("p",{class:"small muted",text:"Es el código que apareció al terminar la instalación en el servidor."})); }
+      mode="register";
+      const f1=pwField("pass","Crea una contraseña","Mínimo 4 caracteres","new-password",()=>[p2]);
+      const f2=pwField("pass2","Repítela","Repite la contraseña","new-password");
+      p1=f1.inp; p2=f2.inp; slot.append(f1.el, f2.el);
+      if (p.isAdmin){
+        code=h("input",{type:"text",id:"admin-code",maxlength:"40",autocomplete:"off",placeholder:"XXXX-XXXX-XXXX",style:"text-transform:uppercase"});
+        slot.append(h("label",{class:"field",for:"admin-code"}, h("span",{class:"lbl",text:"Código de organizador"}), code));
+      }
+      hint.textContent = `Es tu primera vez, ${p.name.split(" ")[0]}. Crea una contraseña para entrar.`;
       btn.textContent="Crear cuenta y entrar";
     }
-    show.checked=false;
   };
   sel.addEventListener("change", draw); draw();
-  show.addEventListener("change",()=>{ [p1,p2].forEach(x=>x&&(x.type=show.checked?"text":"password")); });
-  const form = h("form",{class:"join card",onsubmit:async e=>{
+  const form = h("form",{class:"lform",novalidate:true,onsubmit:async e=>{
     e.preventDefault();
     if (!mode){ sel.focus(); return; }
     const pass = p1.value;
-    if (mode==="register"){ if (pass.length<4){ toast("La contraseña debe tener al menos 4 caracteres."); p1.focus(); return; } if (pass!==p2.value){ toast("Las contraseñas no coinciden."); p2.focus(); return; } }
-    else if (!pass){ p1.focus(); return; }
+    err.textContent="";
+    if (mode==="register"){
+      if (pass.length<4){ err.textContent="La contraseña debe tener al menos 4 caracteres."; p1.focus(); return; }
+      if (pass!==p2.value){ err.textContent="Las contraseñas no coinciden."; p2.focus(); return; }
+    } else if (!pass){ p1.focus(); return; }
     btn.disabled=true;
     try{
       await api("POST", mode==="login" ? "/api/login" : "/api/register", {personId:Number(sel.value), password:pass, remember:remember.checked, adminCode: code ? code.value.trim().toUpperCase() : undefined});
       store.set("amigo-ultimo-nombre", Number(sel.value));
-      S.st = await api("GET","/api/state"); startApp();
-    }catch(err){ status.textContent = err.message; status.style.color="var(--accent)"; if (err.status===409) { loginView(); } }
+      S.st = await api("GET","/api/state"); startApp(); return;
+    }catch(ex){ err.textContent = ex.message; if (ex.status===409){ loginView(); return; } if (mode==="login"){ p1.select(); } }
     btn.disabled=false;
   }},
-    svg(ICON.bow),
-    h("h1",{text: roster.title || "Amigo Secreto"}),
-    h("p",{class:"muted",text:"Elige tu nombre. Si es tu primera vez, crea una contraseña; si ya la tienes, escríbela para entrar."}),
-    h("label",{class:"field",for:"who"}, h("span",{class:"label",text:"¿Quién eres?"}), sel),
-    slot,
-    h("div",{class:"row",style:"gap:16px"}, h("label",{class:"row small",style:"gap:6px",for:"remember"}, remember, "Recordarme en este dispositivo"), h("label",{class:"row small muted",style:"gap:6px",for:"show-pass"}, show, "Ver contraseña")),
-    status,
-    h("div",{class:"row"}, btn),
-    h("p",{class:"small muted",text:"¿Olvidaste tu contraseña o tu nombre no aparece? Avísale al organizador."})
+    h("h2",{class:"lf-title",text:"Entrar"}),
+    h("div",{class:"lf-fields"},
+      h("label",{class:"field",for:"who"}, h("span",{class:"lbl",text:"¿Quién eres?"}), h("div",{class:"sel"}, sel)),
+      hint, slot),
+    h("label",{class:"lf-check",for:"remember"}, remember, h("span",{text:"Recordarme en este dispositivo"})),
+    err, btn,
+    h("p",{class:"lf-foot",text:"¿Olvidaste tu contraseña o no aparece tu nombre? Avísale al organizador."})
   );
-  app.replaceChildren(h("div",{class:"center-screen gutter"}, form));
+  const hero = h("div",{class:"lhero"},
+    h("div",{class:"gtag"}, h("div",{class:"line"}, h("span",{text:"Para"}), h("b",{text:"¿…?"})), h("div",{class:"line"}, h("span",{text:"De"}), h("b",{text:"Un amigo secreto"}))),
+    h("h1",{text:title}),
+    people.length ? h("p",{class:"lhero-sub num",text:`${regCount} de ${people.length} ya entraron`}) : h("p",{class:"lhero-sub",text:"El organizador todavía no cargó la lista de participantes."}),
+    h("div",{class:"dots","aria-hidden":"true"}, people.map(p=>h("i",{class:p.registered?"on":null})))
+  );
+  app.replaceChildren(h("div",{class:"center-screen gutter"}, h("div",{class:"login"}, hero, form)));
   (sel.value ? (p1||sel) : sel).focus();
 }
 

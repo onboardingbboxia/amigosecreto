@@ -9,7 +9,7 @@ CONF=/etc/amigo-secreto.conf
 [ -f "$CONF" ] && . "$CONF"
 DOMAIN="${DOMAIN:-${SAVED_DOMAIN:-srv2209627.hstgr.cloud}}"
 BASE_PATH="${BASE_PATH-${SAVED_BASE_PATH:-}}"   # ej. /amigosecreto (vacío = en la raíz del dominio)
-MAIN_SITE="${MAIN_SITE-${SAVED_MAIN_SITE:-}}"   # opcional: sitio actual del dominio, para el resto de las rutas
+MAIN_SITE="${MAIN_SITE-${SAVED_MAIN_SITE:-}}"   # opcional: sitio externo para el resto de las rutas; si está vacío se muestra la landing
 APP_DIR=/opt/amigo-secreto
 SERVICE=amigo-secreto
 NEW_CODE=0; [ "${1:-}" = "--nuevo-codigo" ] && NEW_CODE=1
@@ -106,7 +106,8 @@ else
 			header_up Host {upstream_hostport}
 		}"
   else
-    FALLBACK="redir * $BASE_PATH/ 302"
+    FALLBACK="root * $APP_DIR/landing
+		file_server"
   fi
 cat > /etc/caddy/Caddyfile <<EOF
 $DOMAIN {

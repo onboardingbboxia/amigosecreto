@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p dist
-PAYLOAD=$(tar -cz server.js content.js seed.json public/index.html | base64 -w 76)
+PAYLOAD=$(tar -cz server.js content.js seed.json public/index.html landing/index.html | base64 -w 76)
 python3 - "$PAYLOAD" <<'EOF'
 import sys
 t = open('deploy/instalar.template.sh').read()
